@@ -1,62 +1,34 @@
 import os
-from fastapi import FastAPI, Request, HTTPException
-from linebot.v3 import WebhookHandler
-from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.messaging import (
-    ApiClient,
-    Configuration,
-    MessagingApi,
-    ReplyMessageRequest,
-    TextMessage,
-)
-from linebot.v3.webhooks import MessageEvent, TextMessageContent
-from dotenv import load_dotenv
+from pathlib import Path
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from backend.database import init_db
+from backend.routers.bills import router as bills_router
 
-from bot.handlers import handle_message
+app = FastAPI(title="Badminton Invoice LIFF")
 
-load_dotenv()
-
-app = FastAPI(title="Badminton Invoice Bot")
-
-_channel_token = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
-_channel_secret = os.environ["LINE_CHANNEL_SECRET"]
-
-configuration = Configuration(access_token=_channel_token)
-webhook_handler = WebhookHandler(_channel_secret)
+init_db()
+app.include_router(bills_router)
 
 
-@app.get("/")
-def health_check():
-    return {"status": "ok", "service": "badminton-invoice-bot"}
+@app.get("/api/config")
+def get_config():
+    return {"liff_id": os.environ.get("MINI_APP_ID", "")}
 
+DIST = Path("frontend/dist")
 
-@app.post("/webhook")
-async def webhook(request: Request):
-    signature = request.headers.get("X-Line-Signature", "")
-    body = await request.body()
-    try:
-        webhook_handler.handle(body.decode("utf-8"), signature)
-    except InvalidSignatureError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
-    return {"status": "ok"}
+if DIST.exists():
+    app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
 
-
-@webhook_handler.add(MessageEvent, message=TextMessageContent)
-def on_text_message(event: MessageEvent):
-    source = event.source
-    if source.type == "group":
-        source_id = f"group_{source.group_id}"
-    elif source.type == "room":
-        source_id = f"room_{source.room_id}"
-    else:
-        source_id = f"user_{source.user_id}"
-
-    reply = handle_message(source_id, event.message.text)
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[TextMessage(text=reply)],
-            )
-        )
+    @app.get("/{full_path:path}")
+    def serve_frontend(full_path: str):
+        # Let the API router handle /api/* — this only catches non-API paths
+        file = DIST / full_path
+        if file.is_file():
+            return FileResponse(file)
+        return FileResponse(DIST / "index.html")
+else:
+    @app.get("/")
+    def dev_root():
+        return {"status": "ok", "note": "Run 'npm run build' in frontend/ to serve the app"}

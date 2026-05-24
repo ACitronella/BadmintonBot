@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: badminton-invoice-bot
+    env: docker
+    dockerBuildArgs:
+      - VITE_LIFF_ID
+    envVars:
+      - key: MINI_APP_ID
+        sync: false
+      - key: DB_PATH
+        value: /var/data/bills.db
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
