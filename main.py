@@ -1,15 +1,28 @@
 import os
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from linebot.v3.exceptions import InvalidSignatureError
 from backend.database import init_db
 from backend.routers.bills import router as bills_router
+from backend.bot import webhook_handler
 
 app = FastAPI(title="Badminton Invoice LIFF")
 
 init_db()
 app.include_router(bills_router)
+
+
+@app.post("/webhook")
+async def webhook(request: Request):
+    signature = request.headers.get("X-Line-Signature", "")
+    body = await request.body()
+    try:
+        webhook_handler.handle(body.decode("utf-8"), signature)
+    except InvalidSignatureError:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    return {"status": "ok"}
 
 
 @app.get("/api/config")

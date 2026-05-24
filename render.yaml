@@ -5,6 +5,10 @@ services:
     dockerBuildArgs:
       - VITE_LIFF_ID
     envVars:
+      - key: LINE_CHANNEL_ACCESS_TOKEN
+        sync: false
+      - key: LINE_CHANNEL_SECRET
+        sync: false
       - key: MINI_APP_ID
         sync: false
       - key: DB_PATH
