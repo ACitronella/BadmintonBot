@@ -1,5 +1,8 @@
+import logging
 import os
 from pathlib import Path
+
+logging.basicConfig(level=logging.INFO)
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse

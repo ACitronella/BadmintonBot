@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid
 import httpx
@@ -5,6 +6,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from backend.database import get_db
 from backend.models import BillResponse, CreateBillRequest, PlayerResult
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
@@ -15,7 +18,11 @@ def _push_bill_card(group_id: str, bill_id: str, bill_name: str, total: float,
                     computed: list[dict]) -> None:
     token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "")
     mini_app_id = os.environ.get("MINI_APP_ID", "")
-    if not token or not mini_app_id:
+    if not token:
+        logger.error("PUSH SKIPPED: LINE_CHANNEL_ACCESS_TOKEN is not set")
+        return
+    if not mini_app_id:
+        logger.error("PUSH SKIPPED: MINI_APP_ID is not set")
         return
 
     view_url = f"https://liff.line.me/{mini_app_id}/bill/{bill_id}"
@@ -87,12 +94,20 @@ def _push_bill_card(group_id: str, bill_id: str, bill_name: str, total: float,
         },
     }
 
-    with httpx.Client(timeout=10) as client:
-        client.post(
-            LINE_PUSH_URL,
-            headers={"Authorization": f"Bearer {token}"},
-            json={"to": group_id, "messages": [flex]},
-        )
+    logger.info("PUSH attempting to group_id=%s bill_id=%s", group_id, bill_id)
+    try:
+        with httpx.Client(timeout=10) as client:
+            res = client.post(
+                LINE_PUSH_URL,
+                headers={"Authorization": f"Bearer {token}"},
+                json={"to": group_id, "messages": [flex]},
+            )
+        if res.status_code == 200:
+            logger.info("PUSH success bill_id=%s", bill_id)
+        else:
+            logger.error("PUSH failed status=%s body=%s", res.status_code, res.text)
+    except Exception as e:
+        logger.exception("PUSH exception bill_id=%s: %s", bill_id, e)
 
 
 @router.post("/bills", response_model=dict)
@@ -158,6 +173,8 @@ def create_bill(req: CreateBillRequest, background_tasks: BackgroundTasks):
             req.total_cost,
             computed,
         )
+    else:
+        logger.warning("PUSH SKIPPED: no group_id in request for bill_id=%s", bill_id)
 
     return {"id": bill_id}
 
