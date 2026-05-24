@@ -32,7 +32,11 @@ export async function getDisplayName(): Promise<string | null> {
 export function getGroupId(): string | null {
   if (!ready) return null
   const ctx = liff.getContext()
-  return ctx?.type === 'group' ? ctx.groupId : null
+  console.log('[LIFF] context:', JSON.stringify(ctx))
+  if (!ctx) return null
+  // LINE Mini App uses groupId for group chats
+  if (ctx.type === 'group' && ctx.groupId) return ctx.groupId
+  return null
 }
 
 export async function shareUrl(url: string, message: string): Promise<void> {

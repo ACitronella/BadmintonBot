@@ -94,7 +94,7 @@ def _push_bill_card(group_id: str, bill_id: str, bill_name: str, total: float,
         },
     }
 
-    logger.info("PUSH attempting to group_id=%s bill_id=%s", group_id, bill_id)
+    logger.info("PUSH attempting to group_id=%r bill_id=%s", group_id, bill_id)
     try:
         with httpx.Client(timeout=10) as client:
             res = client.post(
