@@ -76,7 +76,7 @@ def on_text_message(event: MessageEvent) -> None:
     if not mini_app_id:
         return  # Mini App not configured yet — stay silent
 
-    mini_app_url = f"https://liff.line.me/{mini_app_id}"
+    mini_app_url = f"https://miniapp.line.me/{mini_app_id}"
 
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(

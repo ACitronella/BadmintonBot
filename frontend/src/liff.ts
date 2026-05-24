@@ -45,7 +45,14 @@ export async function sendBillToChat(
   total: number,
   players: { name: string; amount: number }[],
 ): Promise<boolean> {
-  if (!ready || !liff.isApiAvailable('sendMessages')) return false
+  if (!ready) {
+    console.warn('[LIFF] sendBillToChat: LIFF not ready')
+    return false
+  }
+  if (!liff.isApiAvailable('sendMessages')) {
+    console.warn('[LIFF] sendBillToChat: sendMessages not available. Check that chat_message.write scope is enabled in LINE Developer Console → Mini App settings.')
+    return false
+  }
 
   const MAX_ROWS = 8
   const playerRows = players.slice(0, MAX_ROWS).map((p) => ({
@@ -59,6 +66,7 @@ export async function sendBillToChat(
     playerRows.push({ type: 'text', text: `…and ${players.length - MAX_ROWS} more`, size: 'xs', color: '#9ca3af' } as never)
   }
 
+  try {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await liff.sendMessages([({
     type: 'flex',
@@ -98,7 +106,12 @@ export async function sendBillToChat(
       },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any])
-  return true
+    console.log('[LIFF] sendBillToChat: success')
+    return true
+  } catch (e) {
+    console.error('[LIFF] sendBillToChat failed:', e)
+    return false
+  }
 }
 
 export async function shareUrl(url: string, message: string): Promise<void> {

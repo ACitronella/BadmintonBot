@@ -25,7 +25,7 @@ def _push_bill_card(group_id: str, bill_id: str, bill_name: str, total: float,
         logger.error("PUSH SKIPPED: MINI_APP_ID is not set")
         return
 
-    view_url = f"https://liff.line.me/{mini_app_id}/bill/{bill_id}"
+    view_url = f"https://miniapp.line.me/{mini_app_id}/bill/{bill_id}"
     display_name = bill_name or "Badminton Bill"
 
     # Build player rows (cap at 8 to keep the card compact)
