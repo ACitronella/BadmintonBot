@@ -23,10 +23,14 @@ export async function initLiff(): Promise<void> {
   ready = true
 }
 
-export async function getDisplayName(): Promise<string | null> {
+export async function getProfile(): Promise<{ userId: string; displayName: string } | null> {
   if (!ready || !liff.isLoggedIn()) return null
   const profile = await liff.getProfile()
-  return profile.displayName
+  return { userId: profile.userId, displayName: profile.displayName }
+}
+
+export async function getDisplayName(): Promise<string | null> {
+  return getProfile().then((p) => p?.displayName ?? null)
 }
 
 export function getGroupId(): string | null {

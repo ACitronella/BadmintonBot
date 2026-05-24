@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from linebot.v3 import WebhookHandler
 from linebot.v3.messaging import (
     ApiClient,
@@ -13,9 +14,22 @@ from linebot.v3.messaging import (
     URIAction,
 )
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
+from backend.database import get_db
 
 configuration = Configuration(access_token=os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", ""))
 webhook_handler = WebhookHandler(os.environ.get("LINE_CHANNEL_SECRET", ""))
+
+
+def _save_user_group(user_id: str, group_id: str) -> None:
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO user_group (user_id, group_id, updated_at) VALUES (?, ?, ?)",
+            (user_id, group_id, datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 # Respond in groups only when these words appear (or bot is @mentioned)
 _TRIGGERS = {"split", "bill", "แบ่ง", "บิล", "หาร", "คิดเงิน", "แบดมินตัน"}
@@ -69,6 +83,14 @@ def _bill_card(mini_app_url: str) -> FlexMessage:
 
 @webhook_handler.add(MessageEvent, message=TextMessageContent)
 def on_text_message(event: MessageEvent) -> None:
+    # Always persist group_id for every user seen in a group
+    source = event.source
+    if source.type == "group":
+        user_id = getattr(source, "user_id", None)
+        group_id = getattr(source, "group_id", None)
+        if user_id and group_id:
+            _save_user_group(user_id, group_id)
+
     if not _should_respond(event):
         return
 

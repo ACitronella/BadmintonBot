@@ -43,6 +43,13 @@ export async function fetchBill(id: string): Promise<Bill> {
   return res.json()
 }
 
+export async function fetchUserGroupId(userId: string): Promise<string | null> {
+  const res = await fetch(`${BASE}/user/${userId}/group-id`)
+  if (!res.ok) return null
+  const data = await res.json()
+  return data.group_id as string
+}
+
 export async function fetchGroupMembers(groupId: string): Promise<GroupMember[]> {
   const res = await fetch(`${BASE}/group/${groupId}/members`)
   if (!res.ok) {

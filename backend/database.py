@@ -33,6 +33,12 @@ def init_db() -> None:
             amount   REAL NOT NULL,
             FOREIGN KEY (bill_id) REFERENCES bills(id)
         );
+
+        CREATE TABLE IF NOT EXISTS user_group (
+            user_id     TEXT PRIMARY KEY,
+            group_id    TEXT NOT NULL,
+            updated_at  TEXT NOT NULL
+        );
     """)
     # Migrate existing DB that may be missing the session_hours column
     try:

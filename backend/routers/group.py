@@ -1,6 +1,7 @@
 import os
 import httpx
 from fastapi import APIRouter, HTTPException
+from backend.database import get_db
 
 router = APIRouter(prefix="/api")
 
@@ -50,3 +51,17 @@ async def get_group_members(group_id: str):
                 })
 
     return {"members": members}
+
+
+@router.get("/user/{user_id}/group-id")
+def get_user_group_id(user_id: str):
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT group_id FROM user_group WHERE user_id = ?", (user_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="No group found for this user. Make sure the bot is in the group and someone has sent a message.")
+    return {"group_id": row["group_id"]}
