@@ -143,7 +143,7 @@ def create_bill(req: CreateBillRequest, background_tasks: BackgroundTasks):
     conn = get_db()
     try:
         conn.execute(
-            "INSERT INTO bills VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO bills VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 bill_id,
                 req.total_cost,
@@ -153,6 +153,7 @@ def create_bill(req: CreateBillRequest, background_tasks: BackgroundTasks):
                 req.host_name,
                 datetime.now(timezone.utc).isoformat(),
                 req.session_hours,
+                req.bank_account,
             ),
         )
         for p in computed:
@@ -201,6 +202,7 @@ def get_bill(bill_id: str):
         host_name=bill["host_name"],
         created_at=bill["created_at"],
         session_hours=bill["session_hours"],
+        bank_account=bill["bank_account"],
         players=[
             PlayerResult(name=p["name"], hours=p["hours"], amount=p["amount"])
             for p in players

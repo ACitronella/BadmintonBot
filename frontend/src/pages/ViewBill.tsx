@@ -84,6 +84,13 @@ export default function ViewBill() {
           </div>
         )}
 
+        {bill.bank_account && (
+          <div className="bg-white rounded-2xl shadow p-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Pay to</p>
+            <p className="text-sm font-medium text-gray-800">🏦 {bill.bank_account}</p>
+          </div>
+        )}
+
         {/* Player breakdown */}
         <div className="bg-white rounded-2xl shadow p-4">
           <p className="text-xs font-semibold text-gray-400 uppercase mb-3">

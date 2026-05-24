@@ -17,6 +17,7 @@ export async function createBill(payload: {
   host_name: string | null
   group_id: string | null
   session_hours: number | null
+  bank_account: string | null
 }): Promise<{ id: string }> {
   const res = await fetch(`${BASE}/bills`, {
     method: 'POST',

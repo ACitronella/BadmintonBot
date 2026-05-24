@@ -31,6 +31,7 @@ export default function CreateBill() {
   const [billName, setBillName] = useState('')
   const [sessionHours, setSessionHours] = useState('')
   const [note, setNote] = useState('')
+  const [bankAccount, setBankAccount] = useState('')
   const [mode, setMode] = useState<'equal' | 'hours'>('hours')
   const [players, setPlayers] = useState<PlayerInput[]>([
     { ...EMPTY_PLAYER },
@@ -136,6 +137,7 @@ export default function CreateBill() {
         host_name: hostName,
         group_id: groupId,
         session_hours: mode === 'hours' ? sessionHoursNum : null,
+        bank_account: bankAccount.trim() || null,
       })
       setBillId(res.id)
     } catch (e: unknown) {
@@ -179,6 +181,7 @@ export default function CreateBill() {
               setBillId(null)
               setTotal('')
               setSessionHours('')
+              setBankAccount('')
               setPlayers([{ ...EMPTY_PLAYER }, { ...EMPTY_PLAYER }])
             }}
             className="w-full text-sm text-gray-400 underline"
@@ -261,6 +264,15 @@ export default function CreateBill() {
               placeholder="Optional note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase">Bank account</label>
+            <input
+              className="w-full border-b border-gray-200 py-1.5 text-sm focus:outline-none focus:border-green-400"
+              placeholder="e.g. KBank 1234567890 or PromptPay 081-234-5678"
+              value={bankAccount}
+              onChange={(e) => setBankAccount(e.target.value)}
             />
           </div>
         </div>

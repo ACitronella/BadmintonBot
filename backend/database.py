@@ -22,7 +22,8 @@ def init_db() -> None:
             split_mode     TEXT NOT NULL,
             host_name      TEXT,
             created_at     TEXT NOT NULL,
-            session_hours  REAL
+            session_hours  REAL,
+            bank_account   TEXT
         );
 
         CREATE TABLE IF NOT EXISTS bill_players (
@@ -40,10 +41,13 @@ def init_db() -> None:
             updated_at  TEXT NOT NULL
         );
     """)
-    # Migrate existing DB that may be missing the session_hours column
-    try:
-        conn.execute("ALTER TABLE bills ADD COLUMN session_hours REAL")
-        conn.commit()
-    except Exception:
-        pass  # column already exists
+    for migration in [
+        "ALTER TABLE bills ADD COLUMN session_hours REAL",
+        "ALTER TABLE bills ADD COLUMN bank_account TEXT",
+    ]:
+        try:
+            conn.execute(migration)
+            conn.commit()
+        except Exception:
+            pass  # column already exists
     conn.close()

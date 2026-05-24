@@ -25,5 +25,6 @@ export interface Bill {
   host_name: string | null
   created_at: string
   session_hours: number | null
+  bank_account: string | null
   players: PlayerResult[]
 }
