@@ -54,6 +54,12 @@ export default function CreateBill() {
     getDisplayName().then(setHostName)
   }, [])
 
+  // Auto-fill hours for players that haven't been manually set yet
+  useEffect(() => {
+    if (!sessionHours) return
+    setPlayers((prev) => prev.map((p) => p.hours === '' ? { ...p, hours: sessionHours } : p))
+  }, [sessionHours])
+
   async function openGroupPicker() {
     setShowPicker(true)
     if (groupMembers.length > 0) return // already loaded
@@ -79,7 +85,7 @@ export default function CreateBill() {
 
   function addFromGroup(member: GroupMember) {
     if (players.some((p) => p.pictureUrl === member.pictureUrl && p.name === member.displayName)) return
-    setPlayers((prev) => [...prev, { name: member.displayName, hours: '', pictureUrl: member.pictureUrl }])
+    setPlayers((prev) => [...prev, { name: member.displayName, hours: sessionHours, pictureUrl: member.pictureUrl }])
   }
 
   const totalNum = parseFloat(total) || 0
@@ -96,7 +102,7 @@ export default function CreateBill() {
   }
 
   function addPlayer() {
-    setPlayers((prev) => [...prev, { ...EMPTY_PLAYER }])
+    setPlayers((prev) => [...prev, { ...EMPTY_PLAYER, hours: sessionHours }])
   }
 
   function removePlayer(i: number) {
@@ -240,7 +246,7 @@ export default function CreateBill() {
             </div>
             <div className="w-28">
               <label className="text-xs font-semibold text-gray-500 uppercase">
-                Hours played <span className="text-red-400">*</span>
+                Hours court rented <span className="text-red-400">*</span>
               </label>
               <input
                 type="number"
