@@ -39,6 +39,68 @@ export function getGroupId(): string | null {
   return null
 }
 
+export async function sendBillToChat(
+  url: string,
+  billName: string,
+  total: number,
+  players: { name: string; amount: number }[],
+): Promise<boolean> {
+  if (!ready || !liff.isApiAvailable('sendMessages')) return false
+
+  const MAX_ROWS = 8
+  const playerRows = players.slice(0, MAX_ROWS).map((p) => ({
+    type: 'box', layout: 'horizontal',
+    contents: [
+      { type: 'text', text: p.name, size: 'sm', color: '#374151', flex: 1, wrap: true },
+      { type: 'text', text: `฿${p.amount.toFixed(2)}`, size: 'sm', weight: 'bold', color: '#16a34a', align: 'end' },
+    ],
+  }))
+  if (players.length > MAX_ROWS) {
+    playerRows.push({ type: 'text', text: `…and ${players.length - MAX_ROWS} more`, size: 'xs', color: '#9ca3af' } as never)
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await liff.sendMessages([({
+    type: 'flex',
+      altText: `🏸 ${billName || 'Badminton Bill'} — ฿${total.toLocaleString()}`,
+      contents: {
+        type: 'bubble',
+        header: {
+          type: 'box', layout: 'vertical', backgroundColor: '#16a34a', paddingAll: '16px',
+          contents: [
+            { type: 'text', text: '🏸 New Bill', size: 'xs', color: '#bbf7d0' },
+            { type: 'text', text: billName || 'Badminton Bill', size: 'lg', weight: 'bold', color: '#ffffff', wrap: true },
+          ],
+        },
+        body: {
+          type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '16px',
+          contents: [
+            {
+              type: 'box', layout: 'horizontal',
+              contents: [
+                { type: 'text', text: 'Total', size: 'sm', color: '#6b7280', flex: 1 },
+                { type: 'text', text: `฿${total.toLocaleString('en', { minimumFractionDigits: 2 })}`, size: 'sm', weight: 'bold', color: '#16a34a', align: 'end' },
+              ],
+            },
+            { type: 'separator', margin: 'sm' },
+            ...playerRows,
+          ],
+        },
+        footer: {
+          type: 'box', layout: 'vertical', paddingAll: '12px',
+          contents: [
+            {
+              type: 'button', style: 'primary', color: '#22c55e',
+              action: { type: 'uri', label: 'View My Share', uri: url },
+            },
+          ],
+        },
+      },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any])
+  return true
+}
+
 export async function shareUrl(url: string, message: string): Promise<void> {
   if (!ready) {
     // Fallback: copy to clipboard

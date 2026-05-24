@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ApiError, createBill, fetchGroupMembers } from '../api'
-import { getDisplayName, getGroupId, shareUrl } from '../liff'
+import { getDisplayName, getGroupId, sendBillToChat, shareUrl } from '../liff'
 import type { GroupMember, PlayerInput } from '../types'
 
 const EMPTY_PLAYER: PlayerInput = { name: '', hours: '' }
@@ -40,6 +40,7 @@ export default function CreateBill() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [billId, setBillId] = useState<string | null>(null)
+  const [sentToChat, setSentToChat] = useState(false)
   const [copied, setCopied] = useState(false)
 
   // Group member picker state
@@ -125,6 +126,10 @@ export default function CreateBill() {
         session_hours: mode === 'hours' ? sessionHoursNum : null,
       })
       setBillId(res.id)
+
+      const viewUrl = `${window.location.origin}/bill/${res.id}`
+      const sent = await sendBillToChat(viewUrl, billName.trim(), totalNum, preview)
+      setSentToChat(sent)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
@@ -154,16 +159,23 @@ export default function CreateBill() {
         <div className="bg-white rounded-2xl shadow p-6 w-full max-w-sm text-center space-y-4">
           <div className="text-4xl">🏸</div>
           <h1 className="text-xl font-bold text-green-700">Bill Created!</h1>
-          <p className="text-sm text-gray-500 break-all">{billUrl}</p>
-          <button
-            onClick={handleShare}
-            className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition"
-          >
-            {copied ? '✅ Copied!' : '📤 Share to Group'}
-          </button>
+          {sentToChat ? (
+            <p className="text-sm text-green-600 font-medium">✅ Sent to group chat!</p>
+          ) : (
+            <>
+              <p className="text-sm text-gray-500 break-all">{billUrl}</p>
+              <button
+                onClick={handleShare}
+                className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition"
+              >
+                {copied ? '✅ Copied!' : '📤 Share to Group'}
+              </button>
+            </>
+          )}
           <button
             onClick={() => {
               setBillId(null)
+              setSentToChat(false)
               setTotal('')
               setSessionHours('')
               setPlayers([{ ...EMPTY_PLAYER }, { ...EMPTY_PLAYER }])
