@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { createBill } from '../api'
-import { getDisplayName, shareUrl } from '../liff'
-import type { PlayerInput } from '../types'
+import { createBill, fetchGroupMembers } from '../api'
+import { getDisplayName, getGroupId, shareUrl } from '../liff'
+import type { GroupMember, PlayerInput } from '../types'
 
 const EMPTY_PLAYER: PlayerInput = { name: '', hours: '' }
 
@@ -28,7 +28,8 @@ function calcPreview(
 
 export default function CreateBill() {
   const [total, setTotal] = useState('')
-  const [courtName, setCourtName] = useState('')
+  const [billName, setBillName] = useState('')
+  const [sessionHours, setSessionHours] = useState('')
   const [note, setNote] = useState('')
   const [mode, setMode] = useState<'equal' | 'hours'>('hours')
   const [players, setPlayers] = useState<PlayerInput[]>([
@@ -41,14 +42,51 @@ export default function CreateBill() {
   const [billId, setBillId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
+  // Group member picker state
+  const [groupId] = useState<string | null>(() => getGroupId())
+  const [showPicker, setShowPicker] = useState(false)
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
+  const [pickerLoading, setPickerLoading] = useState(false)
+  const [pickerError, setPickerError] = useState('')
+
   useEffect(() => {
     getDisplayName().then(setHostName)
   }, [])
 
+  async function openGroupPicker() {
+    setShowPicker(true)
+    if (groupMembers.length > 0) return // already loaded
+    setPickerLoading(true)
+    setPickerError('')
+    try {
+      const members = await fetchGroupMembers(groupId!)
+      setGroupMembers(members)
+    } catch (e: unknown) {
+      setPickerError(e instanceof Error ? e.message : 'Failed to load members')
+    } finally {
+      setPickerLoading(false)
+    }
+  }
+
+  function isAlreadyAdded(userId: string) {
+    return players.some((p) => p.pictureUrl && p.name === groupMembers.find(m => m.userId === userId)?.displayName)
+  }
+
+  function addFromGroup(member: GroupMember) {
+    if (players.some((p) => p.pictureUrl === member.pictureUrl && p.name === member.displayName)) return
+    setPlayers((prev) => [...prev, { name: member.displayName, hours: '', pictureUrl: member.pictureUrl }])
+  }
+
   const totalNum = parseFloat(total) || 0
   const preview = calcPreview(totalNum, mode, players)
 
+  const sessionHoursNum = parseFloat(sessionHours) || 0
+
   function updatePlayer(i: number, field: keyof PlayerInput, value: string) {
+    if (field === 'hours' && sessionHoursNum > 0) {
+      const parsed = parseFloat(value)
+      if (!isNaN(parsed) && parsed > sessionHoursNum) value = sessionHours
+    }
     setPlayers((prev) => prev.map((p, idx) => (idx === i ? { ...p, [field]: value } : p)))
   }
 
@@ -64,6 +102,7 @@ export default function CreateBill() {
     setError('')
     const validPlayers = players.filter((p) => p.name.trim())
     if (!totalNum || totalNum <= 0) return setError('Please enter a valid total amount')
+    if (mode === 'hours' && sessionHoursNum <= 0) return setError('Please enter hours played')
     if (validPlayers.length < 1) return setError('Add at least one player')
     if (mode === 'hours' && validPlayers.some((p) => !(parseFloat(p.hours) > 0))) {
       return setError('All players need hours greater than 0')
@@ -73,11 +112,13 @@ export default function CreateBill() {
     try {
       const res = await createBill({
         total_cost: totalNum,
-        court_name: courtName.trim(),
+        court_name: billName.trim(),
         note: note.trim(),
         split_mode: mode,
         players: validPlayers,
         host_name: hostName,
+        group_id: groupId,
+        session_hours: mode === 'hours' ? sessionHoursNum : null,
       })
       setBillId(res.id)
     } catch (e: unknown) {
@@ -94,7 +135,7 @@ export default function CreateBill() {
   async function handleShare() {
     if (!billUrl || !billId) return
     const msg =
-      `🏸 Badminton Bill — ${courtName || 'Court'}\n` +
+      `🏸 Badminton Bill — ${billName || 'Court'}\n` +
       `Total: ฿${totalNum.toLocaleString()}\n` +
       `View your share: ${billUrl}`
     await shareUrl(billUrl, msg)
@@ -120,6 +161,7 @@ export default function CreateBill() {
             onClick={() => {
               setBillId(null)
               setTotal('')
+              setSessionHours('')
               setPlayers([{ ...EMPTY_PLAYER }, { ...EMPTY_PLAYER }])
             }}
             className="w-full text-sm text-gray-400 underline"
@@ -155,29 +197,45 @@ export default function CreateBill() {
       </div>
 
       <div className="px-4 space-y-4 mt-4">
-        {/* Court info */}
+        {/* Bill info */}
         <div className="bg-white rounded-2xl shadow p-4 space-y-3">
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">Court name</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase">Bill name</label>
             <input
               className="w-full border-b border-gray-200 py-1.5 text-sm focus:outline-none focus:border-green-400"
               placeholder="e.g. Supersport Arena Court 3"
-              value={courtName}
-              onChange={(e) => setCourtName(e.target.value)}
+              value={billName}
+              onChange={(e) => setBillName(e.target.value)}
             />
           </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">
-              Total cost (THB) <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="number"
-              inputMode="decimal"
-              className="w-full border-b border-gray-200 py-1.5 text-2xl font-bold text-green-600 focus:outline-none focus:border-green-400"
-              placeholder="0"
-              value={total}
-              onChange={(e) => setTotal(e.target.value)}
-            />
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="text-xs font-semibold text-gray-500 uppercase">
+                Total cost (THB) <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                className="w-full border-b border-gray-200 py-1.5 text-2xl font-bold text-green-600 focus:outline-none focus:border-green-400"
+                placeholder="0"
+                value={total}
+                onChange={(e) => setTotal(e.target.value)}
+              />
+            </div>
+            <div className="w-28">
+              <label className="text-xs font-semibold text-gray-500 uppercase">
+                Hours played <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                className="w-full border-b border-gray-200 py-1.5 text-2xl font-bold text-green-600 focus:outline-none focus:border-green-400"
+                placeholder="0"
+                value={sessionHours}
+                onChange={(e) => setSessionHours(e.target.value)}
+              />
+            </div>
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-500 uppercase">Note</label>
@@ -214,43 +272,129 @@ export default function CreateBill() {
         <div className="bg-white rounded-2xl shadow p-4 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-gray-500 uppercase">Players</p>
-            <button
-              onClick={addPlayer}
-              className="text-xs text-green-600 font-semibold"
-            >
-              + Add player
-            </button>
+            <div className="flex gap-2">
+              {groupId && (
+                <button
+                  onClick={openGroupPicker}
+                  className="text-xs bg-green-50 text-green-600 font-semibold px-2 py-1 rounded-lg"
+                >
+                  👥 From group
+                </button>
+              )}
+              <button
+                onClick={addPlayer}
+                className="text-xs bg-gray-50 text-gray-500 font-semibold px-2 py-1 rounded-lg"
+              >
+                ✏️ Type name
+              </button>
+            </div>
           </div>
+
+          {players.length === 0 && (
+            <p className="text-sm text-gray-300 text-center py-2">No players added yet</p>
+          )}
 
           {players.map((p, i) => (
             <div key={i} className="flex gap-2 items-center">
-              <input
-                className="flex-1 border-b border-gray-200 py-1.5 text-sm focus:outline-none focus:border-green-400"
-                placeholder={`Player ${i + 1} name`}
-                value={p.name}
-                onChange={(e) => updatePlayer(i, 'name', e.target.value)}
-              />
-              {mode === 'hours' && (
+              {/* Avatar for group members, blank space for manual */}
+              {p.pictureUrl ? (
+                <img src={p.pictureUrl} className="w-7 h-7 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                  <span className="text-xs text-gray-400">✏️</span>
+                </div>
+              )}
+
+              {/* Name: read-only for group members, editable for manual */}
+              {p.pictureUrl ? (
+                <span className="flex-1 py-1.5 text-sm text-gray-700">{p.name}</span>
+              ) : (
                 <input
-                  type="number"
-                  inputMode="decimal"
-                  className="w-16 border-b border-gray-200 py-1.5 text-sm text-center focus:outline-none focus:border-green-400"
-                  placeholder="hrs"
-                  value={p.hours}
-                  onChange={(e) => updatePlayer(i, 'hours', e.target.value)}
+                  className="flex-1 border-b border-gray-200 py-1.5 text-sm focus:outline-none focus:border-green-400"
+                  placeholder={`Player ${i + 1} name`}
+                  value={p.name}
+                  onChange={(e) => updatePlayer(i, 'name', e.target.value)}
                 />
               )}
-              {players.length > 1 && (
-                <button
-                  onClick={() => removePlayer(i)}
-                  className="text-gray-300 hover:text-red-400 text-lg leading-none"
-                >
-                  ×
-                </button>
+
+              {mode === 'hours' && (
+                <div className="flex flex-col items-center w-16">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    max={sessionHoursNum > 0 ? sessionHoursNum : undefined}
+                    className="w-full border-b border-gray-200 py-1.5 text-sm text-center focus:outline-none focus:border-green-400"
+                    placeholder="hrs"
+                    value={p.hours}
+                    onChange={(e) => updatePlayer(i, 'hours', e.target.value)}
+                  />
+                  {sessionHoursNum > 0 && (
+                    <span className="text-xs text-gray-300">max {sessionHoursNum}</span>
+                  )}
+                </div>
               )}
+
+              <button
+                onClick={() => removePlayer(i)}
+                className="text-gray-300 hover:text-red-400 text-lg leading-none"
+              >
+                ×
+              </button>
             </div>
           ))}
         </div>
+
+        {/* Group member picker (bottom sheet) */}
+        {showPicker && (
+          <div
+            className="fixed inset-0 bg-black/40 z-40 flex items-end"
+            onClick={() => setShowPicker(false)}
+          >
+            <div
+              className="bg-white w-full rounded-t-2xl max-h-[70vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b">
+                <p className="font-semibold text-gray-700">Select group members</p>
+                <button onClick={() => setShowPicker(false)} className="text-gray-400 text-xl leading-none">×</button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 px-4 py-2">
+                {pickerLoading && (
+                  <p className="text-sm text-gray-400 text-center py-6">Loading members…</p>
+                )}
+                {pickerError && (
+                  <p className="text-sm text-red-400 text-center py-6">{pickerError}</p>
+                )}
+                {!pickerLoading && !pickerError && groupMembers.map((m) => {
+                  const added = players.some(
+                    (p) => p.pictureUrl === m.pictureUrl && p.name === m.displayName
+                  )
+                  return (
+                    <div
+                      key={m.userId}
+                      onClick={() => !added && addFromGroup(m)}
+                      className={`flex items-center gap-3 py-3 border-b last:border-0 ${added ? 'opacity-40' : 'cursor-pointer active:bg-gray-50'}`}
+                    >
+                      {m.pictureUrl ? (
+                        <img src={m.pictureUrl} className="w-9 h-9 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-sm">
+                          {m.displayName[0]}
+                        </div>
+                      )}
+                      <span className="flex-1 text-sm text-gray-700">{m.displayName}</span>
+                      <span className={`text-sm font-semibold ${added ? 'text-gray-400' : 'text-green-500'}`}>
+                        {added ? 'Added' : '+ Add'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Live preview */}
         {preview.length > 0 && totalNum > 0 && (

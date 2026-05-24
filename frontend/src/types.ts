@@ -1,6 +1,13 @@
 export interface PlayerInput {
   name: string
   hours: string // string so the form input stays editable
+  pictureUrl?: string // set when added from group; undefined for manual entries
+}
+
+export interface GroupMember {
+  userId: string
+  displayName: string
+  pictureUrl: string
 }
 
 export interface PlayerResult {
@@ -17,5 +24,6 @@ export interface Bill {
   split_mode: 'equal' | 'hours'
   host_name: string | null
   created_at: string
+  session_hours: number | null
   players: PlayerResult[]
 }

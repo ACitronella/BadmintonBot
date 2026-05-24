@@ -15,13 +15,14 @@ def init_db() -> None:
     conn = get_db()
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS bills (
-            id          TEXT PRIMARY KEY,
-            total_cost  REAL NOT NULL,
-            court_name  TEXT,
-            note        TEXT,
-            split_mode  TEXT NOT NULL,
-            host_name   TEXT,
-            created_at  TEXT NOT NULL
+            id             TEXT PRIMARY KEY,
+            total_cost     REAL NOT NULL,
+            court_name     TEXT,
+            note           TEXT,
+            split_mode     TEXT NOT NULL,
+            host_name      TEXT,
+            created_at     TEXT NOT NULL,
+            session_hours  REAL
         );
 
         CREATE TABLE IF NOT EXISTS bill_players (
@@ -33,5 +34,10 @@ def init_db() -> None:
             FOREIGN KEY (bill_id) REFERENCES bills(id)
         );
     """)
-    conn.commit()
+    # Migrate existing DB that may be missing the session_hours column
+    try:
+        conn.execute("ALTER TABLE bills ADD COLUMN session_hours REAL")
+        conn.commit()
+    except Exception:
+        pass  # column already exists
     conn.close()

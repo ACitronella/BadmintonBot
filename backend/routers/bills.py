@@ -1,14 +1,102 @@
+import os
 import uuid
+import httpx
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from backend.database import get_db
 from backend.models import BillResponse, CreateBillRequest, PlayerResult
 
 router = APIRouter(prefix="/api")
 
+LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
+
+
+def _push_bill_card(group_id: str, bill_id: str, bill_name: str, total: float,
+                    computed: list[dict]) -> None:
+    token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "")
+    mini_app_id = os.environ.get("MINI_APP_ID", "")
+    if not token or not mini_app_id:
+        return
+
+    view_url = f"https://liff.line.me/{mini_app_id}/bill/{bill_id}"
+    display_name = bill_name or "Badminton Bill"
+
+    # Build player rows (cap at 8 to keep the card compact)
+    MAX_ROWS = 8
+    player_rows = []
+    for p in computed[:MAX_ROWS]:
+        player_rows.append({
+            "type": "box", "layout": "horizontal", "spacing": "sm",
+            "contents": [
+                {"type": "text", "text": p["name"], "size": "sm",
+                 "color": "#374151", "flex": 1, "wrap": True},
+                {"type": "text", "text": f"฿{p['amount']:,.2f}", "size": "sm",
+                 "weight": "bold", "color": "#16a34a", "align": "end"},
+            ],
+        })
+    if len(computed) > MAX_ROWS:
+        player_rows.append({
+            "type": "text",
+            "text": f"…and {len(computed) - MAX_ROWS} more",
+            "size": "xs", "color": "#9ca3af",
+        })
+
+    flex = {
+        "type": "flex",
+        "altText": f"🏸 {display_name} — ฿{total:,.2f}",
+        "contents": {
+            "type": "bubble",
+            "header": {
+                "type": "box", "layout": "vertical",
+                "backgroundColor": "#16a34a", "paddingAll": "16px",
+                "contents": [
+                    {"type": "text", "text": "🏸 New Bill", "size": "xs",
+                     "color": "#bbf7d0"},
+                    {"type": "text", "text": display_name, "size": "lg",
+                     "weight": "bold", "color": "#ffffff", "wrap": True},
+                ],
+            },
+            "body": {
+                "type": "box", "layout": "vertical", "spacing": "sm",
+                "paddingAll": "16px",
+                "contents": [
+                    {
+                        "type": "box", "layout": "horizontal",
+                        "contents": [
+                            {"type": "text", "text": "Total",
+                             "size": "sm", "color": "#6b7280", "flex": 1},
+                            {"type": "text", "text": f"฿{total:,.2f}",
+                             "size": "sm", "weight": "bold", "color": "#16a34a",
+                             "align": "end"},
+                        ],
+                    },
+                    {"type": "separator", "margin": "sm"},
+                    *player_rows,
+                ],
+            },
+            "footer": {
+                "type": "box", "layout": "vertical", "paddingAll": "12px",
+                "contents": [
+                    {
+                        "type": "button", "style": "primary", "color": "#22c55e",
+                        "action": {"type": "uri", "label": "View My Share",
+                                   "uri": view_url},
+                    }
+                ],
+            },
+        },
+    }
+
+    with httpx.Client(timeout=10) as client:
+        client.post(
+            LINE_PUSH_URL,
+            headers={"Authorization": f"Bearer {token}"},
+            json={"to": group_id, "messages": [flex]},
+        )
+
 
 @router.post("/bills", response_model=dict)
-def create_bill(req: CreateBillRequest):
+def create_bill(req: CreateBillRequest, background_tasks: BackgroundTasks):
     if req.total_cost <= 0:
         raise HTTPException(status_code=400, detail="total_cost must be positive")
     if not req.players:
@@ -40,7 +128,7 @@ def create_bill(req: CreateBillRequest):
     conn = get_db()
     try:
         conn.execute(
-            "INSERT INTO bills VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO bills VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 bill_id,
                 req.total_cost,
@@ -49,6 +137,7 @@ def create_bill(req: CreateBillRequest):
                 req.split_mode,
                 req.host_name,
                 datetime.now(timezone.utc).isoformat(),
+                req.session_hours,
             ),
         )
         for p in computed:
@@ -59,6 +148,16 @@ def create_bill(req: CreateBillRequest):
         conn.commit()
     finally:
         conn.close()
+
+    if req.group_id:
+        background_tasks.add_task(
+            _push_bill_card,
+            req.group_id,
+            bill_id,
+            req.court_name or "",
+            req.total_cost,
+            computed,
+        )
 
     return {"id": bill_id}
 
@@ -84,6 +183,7 @@ def get_bill(bill_id: str):
         split_mode=bill["split_mode"],
         host_name=bill["host_name"],
         created_at=bill["created_at"],
+        session_hours=bill["session_hours"],
         players=[
             PlayerResult(name=p["name"], hours=p["hours"], amount=p["amount"])
             for p in players

@@ -29,6 +29,12 @@ export async function getDisplayName(): Promise<string | null> {
   return profile.displayName
 }
 
+export function getGroupId(): string | null {
+  if (!ready) return null
+  const ctx = liff.getContext()
+  return ctx?.type === 'group' ? ctx.groupId : null
+}
+
 export async function shareUrl(url: string, message: string): Promise<void> {
   if (!ready) {
     // Fallback: copy to clipboard

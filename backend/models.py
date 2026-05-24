@@ -14,6 +14,8 @@ class CreateBillRequest(BaseModel):
     split_mode: str  # "equal" | "hours"
     players: list[PlayerInput]
     host_name: Optional[str] = None
+    group_id: Optional[str] = None  # LINE group to push the bill summary to
+    session_hours: Optional[float] = None  # total court hours for the session
 
 
 class PlayerResult(BaseModel):
@@ -30,4 +32,5 @@ class BillResponse(BaseModel):
     split_mode: str
     host_name: Optional[str]
     created_at: str
+    session_hours: Optional[float]
     players: list[PlayerResult]

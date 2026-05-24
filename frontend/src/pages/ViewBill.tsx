@@ -44,10 +44,7 @@ export default function ViewBill() {
     )
   }
 
-  const totalHours =
-    bill.split_mode === 'hours'
-      ? bill.players.reduce((s, p) => s + (p.hours ?? 0), 0)
-      : null
+  const sessionHours = bill.split_mode === 'hours' ? bill.session_hours : null
 
   return (
     <div className="min-h-screen bg-green-50 pb-10">
@@ -75,8 +72,8 @@ export default function ViewBill() {
             <p className="text-sm font-semibold text-gray-600">
               {bill.split_mode === 'hours' ? '⏱️ Hours played' : '👥 Equal'}
             </p>
-            {totalHours !== null && (
-              <p className="text-xs text-gray-400">{totalHours.toFixed(1)} hrs total</p>
+            {sessionHours != null && (
+              <p className="text-xs text-gray-400">{sessionHours} hrs total</p>
             )}
           </div>
         </div>
@@ -115,9 +112,9 @@ export default function ViewBill() {
         </div>
 
         {/* Per-hour rate if applicable */}
-        {bill.split_mode === 'hours' && totalHours && totalHours > 0 && (
+        {bill.split_mode === 'hours' && sessionHours && sessionHours > 0 && (
           <div className="text-center text-xs text-gray-400">
-            ฿{(bill.total_cost / totalHours).toFixed(2)} / hour
+            ฿{(bill.total_cost / sessionHours).toFixed(2)} / hour
           </div>
         )}
       </div>

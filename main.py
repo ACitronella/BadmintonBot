@@ -6,12 +6,14 @@ from fastapi.responses import FileResponse
 from linebot.v3.exceptions import InvalidSignatureError
 from backend.database import init_db
 from backend.routers.bills import router as bills_router
+from backend.routers.group import router as group_router
 from backend.bot import webhook_handler
 
 app = FastAPI(title="Badminton Invoice LIFF")
 
 init_db()
 app.include_router(bills_router)
+app.include_router(group_router)
 
 
 @app.post("/webhook")
