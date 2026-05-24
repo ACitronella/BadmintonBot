@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createBill, fetchGroupMembers } from '../api'
+import { ApiError, createBill, fetchGroupMembers } from '../api'
 import { getDisplayName, getGroupId, shareUrl } from '../liff'
 import type { GroupMember, PlayerInput } from '../types'
 
@@ -62,7 +62,11 @@ export default function CreateBill() {
       const members = await fetchGroupMembers(groupId!)
       setGroupMembers(members)
     } catch (e: unknown) {
-      setPickerError(e instanceof Error ? e.message : 'Failed to load members')
+      if (e instanceof ApiError && e.status === 403) {
+        setPickerError('This feature is not available as the bot is not premium or verified.')
+      } else {
+        setPickerError(e instanceof Error ? e.message : 'Failed to load members')
+      }
     } finally {
       setPickerLoading(false)
     }

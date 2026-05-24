@@ -21,10 +21,16 @@ async def get_group_members(group_id: str):
             f"{LINE_API}/group/{group_id}/members/ids",
             headers=headers,
         )
+        if ids_res.status_code == 401:
+            raise HTTPException(status_code=502, detail="Invalid LINE channel access token")
+        if ids_res.status_code == 403:
+            raise HTTPException(status_code=403, detail="Bot does not have permission to read this group")
         if ids_res.status_code == 404:
             raise HTTPException(status_code=404, detail="Group not found or bot is not in the group")
+        if ids_res.status_code == 429:
+            raise HTTPException(status_code=502, detail="LINE API rate limit exceeded, try again later")
         if ids_res.status_code != 200:
-            raise HTTPException(status_code=502, detail="Failed to fetch group member IDs")
+            raise HTTPException(status_code=502, detail=f"LINE API error: {ids_res.status_code}")
 
         member_ids: list[str] = ids_res.json().get("memberIds", [])
 
